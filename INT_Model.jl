@@ -3,7 +3,7 @@ model = JuMP.Model(with_optimizer(CPLEX.Optimizer))
 MOI.set(model, MOI.RawParameter("CPX_PARAM_TILIM"), 30)
 
 
-#variable 
+#variable
   @variable(model, s_b[m in M, d in vertices(mg), P in idxs_Rs[m]], Bin)
   @variable(model, t_b[m in M, P in idxs_Rt[m]], Bin)
   @variable(model, x[(i,j) in links, f in F; i!=j], Bin)
@@ -14,57 +14,95 @@ MOI.set(model, MOI.RawParameter("CPX_PARAM_TILIM"), 30)
 
 
 #objective
-@objective(model, Max, sum(s_b[m,d,P]  for m in M, d in vertices(mg), P in idxs_Rs[m]) + sum(t_b[m,P] for m in M, P in idxs_Rt[m]))
+@objective(
+  model,
+  Max,
+  sum(s_b[m, d, P] for m in M, d in vertices(mg), P in idxs_Rs[m]) +
+  sum(t_b[m, P] for m in M, P in idxs_Rt[m]),
+)
 
 #constraints
 #starting of the flow
 for f in F
-@constraint(model, sum(x[(S[f],j),f] for j in neighborhood(mg, S[f], 1) if S[f]!=j) + sum(x[(j,S[f]),f] for j in neighborhood(mg, S[f], 1) if j!=S[f]) == 1)
+  @constraint(
+    model,
+    sum(x[(S[f], j), f] for j in neighborhood(mg, S[f], 1) if S[f] != j) +
+    sum(x[(j, S[f]), f] for j in neighborhood(mg, S[f], 1) if j != S[f]) == 1,
+  )
 end
 
 #ending of the flow
 for f in F
-@constraint(model, sum(x[(i,E[f]),f] for i in neighborhood(mg, E[f],1) if i!=E[f]) + sum(x[(E[f],i),f] for i in neighborhood(mg, E[f],1) if E[f]!=i) == 1)
+  @constraint(
+    model,
+    sum(x[(i, E[f]), f] for i in neighborhood(mg, E[f], 1) if i != E[f]) +
+    sum(x[(E[f], i), f] for i in neighborhood(mg, E[f], 1) if E[f] != i) == 1,
+  )
 end
 
 #flow conservation
 for f in F, i in vertices(mg)
-if (i!= S[f] && i!=E[f])
-@constraint(model, sum(x[(j,i),f] for j in neighborhood(mg, i, 1) if i!=j) - sum(x[(i,j),f] for j in neighborhood(mg, i, 1) if j!=i) == 0)
+  if (i != S[f] && i != E[f])
+    @constraint(
+      model,
+      sum(x[(j, i), f] for j in neighborhood(mg, i, 1) if i != j) -
+      sum(x[(i, j), f] for j in neighborhood(mg, i, 1) if j != i) == 0,
+    )
+  end
 end
+
+# New polynomial for removing constraints
+for (i, j) in links, f in F
+  @constraint(
+    model,
+    ttt[j, f] >= ttt[i, f] + 1 - length(D) * (1 - x[(i, j), f]),
+  )
 end
 
 #removing subtour of size two
-for (i,j) in links, f in F
-@constraint(model, x[(i,j),f] + x[(j,i),f]  <= 1)
+for (i, j) in links, f in F
+  @constraint(model, x[(i, j), f] + x[(j, i), f] <= 1)
 end
 
 # single telemetry is collected by a single flow
-for d in vertices(mg), v in get_prop(mg, d, :Items),f in F
-@constraint(model, y[d,v,f] <= sum(x[(i,d),f] for i in neighborhood(mg, d, 1) if i!=d))
+for d in vertices(mg), v in get_prop(mg, d, :Items), f in F
+  @constraint(
+    model,
+    y[d, v, f] <= sum(x[(i, d), f] for i in neighborhood(mg, d, 1) if i != d),
+  )
 end
 
 #exch flow does not excced it capacity
 for f in F
-@constraint(model, sum(y[d,v,f]*Size[v]  for d in vertices(mg), v in get_prop(mg, d, :Items)) <= Kf[f] )
+  @constraint(
+    model,
+    sum(y[d, v, f] * Size[v] for d in vertices(mg), v in get_prop(
+      mg,
+      d,
+      :Items,
+    )) <= Kf[f],
+  )
 end
 
 for m in M, P in Rs[m], d in vertices(mg)
-@constraint(model, s[m,d,P] == sum(y[d,v,f] for v in P, f in F))
+  @constraint(model, s[m, d, P] == sum(y[d, v, f] for v in P, f in F))
 end
 
-for m in M, P in Rt[m] 
-if HH[P] > TT[P]
-@constraint(model, t[m,P] == sum(y[d,v,f] for d in vertices(mg), v in P, f in F))
-end
+for m in M, P in Rt[m]
+  if HH[P] > TT[P]
+    @constraint(
+      model,
+      t[m, P] == sum(y[d, v, f] for d in vertices(mg), v in P, f in F),
+    )
+  end
 end
 
 for m in M, P in Rs[m], d in vertices(mg), P1 in idxs_Rs[m]
-@constraint(model, s_b[m,d,P1] <= s[m,d,P]/length(P))
+  @constraint(model, s_b[m, d, P1] <= s[m, d, P] / length(P))
 end
 
 for m in M, P in Rt[m], P2 in idxs_Rt[m]
-@constraint(model, t_b[m,P2] <= t[m,P]/length(P))
+  @constraint(model, t_b[m, P2] <= t[m, P] / length(P))
 end
 
 #writing the model to LP file
@@ -76,3 +114,7 @@ MOI.write_to_file(lp_model, "INT_Model.lp")
 
 @show termination_status(model)
 @show primal_status(model)
+
+#Getting the value of the objective
+obj_value = JuMP.objective_value(model)
+println("Objective value: ", obj_value)

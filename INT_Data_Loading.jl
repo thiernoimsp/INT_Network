@@ -14,13 +14,13 @@ no_link = length(df[:,1])
 
 nodes = 1:no_node
 g = SimpleGraph(no_node)
-for i=1:no_link
-add_edge!(g, src_node[i], dst_node[i])
+for i = 1:no_link
+  add_edge!(g, src_node[i], dst_node[i])
 end
 
 # links of the network
-links=Vector{NTuple{2, Int64}}()
-for i=1:no_link
+links = Vector{NTuple{2,Int64}}()
+for i = 1:no_link
 #if (src_node[i] < dst_node[i])
   push!(links, (src_node[i], dst_node[i]))
 #end
@@ -132,7 +132,7 @@ M = 1:4
   # Functional for the subset of a set
 
   function subsets(A::AbstractArray,r::Union{AbstractArray,Integer})
-    o= Array{Array{eltype(A),1},1}(undef,0)         
+    o= Array{Array{eltype(A),1},1}(undef,0)
     if typeof(r)<:Integer
         r>length(A) && (r=[length(A)])
         r=[r...]
@@ -143,7 +143,7 @@ M = 1:4
     end
     for n = r
         a=combinations(A,n)
-        for i in a     
+        for i in a
             push!(o,i)
         end
     end
@@ -158,49 +158,49 @@ M = 1:4
   for m in M
     PR[m] = subsets(R[m])
   end
-  
+
   # index for set Rs
   idxs_Rs = Dict()
-  for m in M
+for m in M
   idxs_Rs[m] = 1:length(PR[m])
-@show(idxs_Rs[m])
-  end
+  @show(idxs_Rs[m])
+end
 
 
   #spatial dependency
   #Rs = Vector(undef, last(M))
   Rs = Dict()
-  for m in M
+for m in M
   Rs[m] = PR[m][idxs_Rs[m]]
-  end
+end
 
   # index for set Rt
   idxs_Rt = Dict()
-  for m in M
+for m in M
   idxs_Rt[m] = 1:length(Rs[m])
-@show(idxs_Rt[m])
-  end
+  @show(idxs_Rt[m])
+end
 
   #temporal dependency
   #Rt = Vector(undef, last(M))
   Rt = Dict()
-  for m in M
+for m in M
   Rt[m] = Rs[m][idxs_Rt[m]]
   #@show Rt[m]
-  end
+end
 
   #function of the required deadline time
-  TT=Dict()
-  c=1
-  for m in M, P in Rs[m]
-  c += 1
+global  TT = Dict()
+c = 1
+for m in M, P in Rs[m]
+  global c += 1
   TT[P] = c
-  end
+end
 
   #function of the last time unit
-  HH=Dict()
-  c=0
-  for m in M, P in Rt[m]
-  c += 1
+global  HH = Dict()
+c = 0
+for m in M, P in Rt[m]
+  global c += 1
   HH[P] = c
-  end
+end
